@@ -260,8 +260,43 @@ bool is_legal(const int8_t board[9][9], const int8_t mochigoma[2][8], int turn,
     return true;
 }
 
+bool can_declare(const int8_t board[9][9], const int8_t mochigoma[2][8],
+                 int turn) {
+    auto moves_pass = moves(board, mochigoma, -turn);
+    for (auto &&s : moves_pass) {
+        if (s == "capture") return false;  // 王手
+    }
+    int score = 0, count = 0, king = 0;
+    for (int i = 0; i < 3; i++) {
+        int idx = turn == 1 ? i : 8 - i;
+        for (int j = 0; j < 9; j++) {
+            int type = board[idx][j] * turn;
+            if (type == 8) {
+                king++;
+            } else if (type > 0) {
+                count++;
+                if (type > 8) type -= 8;
+                score += type >= 6 ? 5 : 1;
+            }
+        }
+    }
+    if (king == 0) return false;
+    if (count < 10) return false;
+    for (int i = 1; i < 8; i++) {
+        int value = i >= 6 ? 5 : 1;
+        score += mochigoma[(1 - turn) >> 1][i] * value;
+    }
+    if (turn == 1) {
+        if (score < 28) return false;
+    } else {
+        if (score < 27) return false;
+    }
+    return true;
+}
+
 std::string bestmove(const int8_t board[9][9], const int8_t mochigoma[2][8],
                      int turn) {
+    if (can_declare(board, mochigoma, turn)) return "win";
     auto res = moves(board, mochigoma, turn);
     std::shuffle(res.begin(), res.end(), rng);
     for (auto &&s : res) {
