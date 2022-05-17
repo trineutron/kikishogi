@@ -21,6 +21,9 @@ constexpr int8_t mochigoma_startpos[2][8]{};
 
 std::mt19937_64 rng;
 
+std::string bestmove(const int8_t board[9][9], const int8_t mochigoma[2][8],
+                     int turn);
+
 void usi_init() {
     std::cout << "id name kikishogi" << std::endl;
     std::cout << "id author trineutron" << std::endl;
@@ -212,12 +215,22 @@ std::vector<std::string> moves(const int8_t board[9][9],
             }
         }
     }
-    for (int type = 2; type < 8; type++) {
+    bool fu_already[9]{};
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if (board[i][j] == turn) {
+                fu_already[j] = true;
+            }
+        }
+    }
+
+    for (int type = 1; type < 8; type++) {
         if (mochigoma[(1 - turn) >> 1][type] == 0) continue;
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 if (board[i][j]) continue;
                 if (not can_move(i, type, turn)) continue;
+                if (type == 1 and fu_already[j]) continue;
                 std::string s;
                 s += text_type[type];
                 s += '*';
@@ -240,6 +253,9 @@ bool is_legal(const int8_t board[9][9], const int8_t mochigoma[2][8], int turn,
     auto res = moves(board_new, mochigoma_new, -turn);
     for (auto &&s : res) {
         if (s == "capture") return false;
+    }
+    if (move_to_check[0] == 'P') {
+        return bestmove(board_new, mochigoma_new, -turn) != "resign";
     }
     return true;
 }
@@ -269,15 +285,6 @@ int main() {
             ready();
         } else if (type == "position") {
             get_board(s, board, mochigoma, turn);
-            std::cout << "info string";
-            for (int i = 0; i < 2; i++) {
-                for (int j = 0; j < 8; j++) {
-                    std::cout << ' ' << int(mochigoma[i][j]);
-                }
-            }
-            std::cout << std::endl;
-            // print_board(board);
-            // std::cerr << turn << std::endl;
         } else if (type == "go") {
             std::cout << "bestmove " << bestmove(board, mochigoma, turn)
                       << std::endl;
