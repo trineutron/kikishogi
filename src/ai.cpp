@@ -56,7 +56,7 @@ const std::vector<std::pair<int, int>> type_dir[9]{
     {{-1, 0}},
     {{-2, -1}, {-2, 1}},
     {{-1, -1}, {-1, 0}, {-1, 1}, {1, -1}, {1, 1}},
-    {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}},
+    {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, 0}},
     {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}},
     {{-1, 0}, {0, -1}, {0, 1}, {1, 0}},
     {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
@@ -134,7 +134,7 @@ void print_board(const int8_t board_print[9][9]) {
     }
 }
 
-std::string bestmove(const int8_t board[9][9], int turn) {
+std::vector<std::string> moves(const int8_t board[9][9], int turn) {
     std::vector<std::string> res;
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 9; j++) {
@@ -171,6 +171,9 @@ std::string bestmove(const int8_t board[9][9], int turn) {
                                            (i_next == 8 and type <= 2);
                         }
                         if (type == 5 or type >= 8) can_promote = false;
+                        if (turn * board[i_next][j_next] == -8) {
+                            res.push_back("capture");
+                        }
                         if (not must_promote) res.push_back(s);
                         if (can_promote) {
                             s += '+';
@@ -182,11 +185,28 @@ std::string bestmove(const int8_t board[9][9], int turn) {
             }
         }
     }
-    if (res.empty()) {
-        return "resign";
+    return res;
+}
+
+bool is_legal(const int8_t board[9][9], int turn,
+              const std::string &move_to_check) {
+    int8_t board_new[9][9];
+    copy_board(board, board_new);
+    move(board_new, turn, move_to_check);
+    auto res = moves(board_new, -turn);
+    for (auto &&s : res) {
+        if (s == "capture") return false;
     }
+    return true;
+}
+
+std::string bestmove(const int8_t board[9][9], int turn) {
+    auto res = moves(board, turn);
     std::shuffle(res.begin(), res.end(), rng);
-    return res.front();
+    for (auto &&s : res) {
+        if (is_legal(board, turn, s)) return s;
+    }
+    return "resign";
 }
 
 int main() {
