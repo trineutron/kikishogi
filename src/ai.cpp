@@ -60,7 +60,6 @@ bool can_move(const int x, const int type, const int turn) {
 }
 
 class State {
-   public:
     std::array<std::array<int8_t, 9>, 9> board;
     std::array<std::array<int8_t, 8>, 2> mochigoma;
     int turn;
@@ -112,27 +111,7 @@ class State {
         turn *= -1;
     }
 
-    void get_board(const std::string &s) {
-        std::stringstream ss(s);
-        bool is_move_mode = false;
-        while (true) {
-            std::string word;
-            ss >> word;
-            if (not ss) break;
-            if (word == "position") {
-            } else if (word == "startpos") {
-                this->set_startpos();
-            } else if (word == "sfen") {
-                std::cerr << "Warning: sfen" << std::endl;
-            } else if (word == "moves") {
-                is_move_mode = true;
-            } else if (is_move_mode) {
-                this->move(word);
-            } else {
-                std::cerr << "Warning: sfenstring" << std::endl;
-            }
-        }
-    }
+    void pass() { turn = -turn; }
 
     std::vector<std::string> moves() const {
         std::vector<std::string> res;
@@ -221,8 +200,10 @@ class State {
         return true;
     }
 
-    bool can_declare() {
-        for (auto &&s : State{board, mochigoma, -turn}.moves()) {
+    bool can_declare() const {
+        State state_pass{*this};
+        state_pass.pass();
+        for (auto &&s : state_pass.moves()) {
             if (s == "capture") return false;  // 王手
         }
         int score = 0, count = 0, king = 0;
@@ -253,7 +234,30 @@ class State {
         return true;
     }
 
-    std::string bestmove() {
+   public:
+    void get_board(const std::string &s) {
+        std::stringstream ss(s);
+        bool is_move_mode = false;
+        while (true) {
+            std::string word;
+            ss >> word;
+            if (not ss) break;
+            if (word == "position") {
+            } else if (word == "startpos") {
+                this->set_startpos();
+            } else if (word == "sfen") {
+                std::cerr << "Warning: sfen" << std::endl;
+            } else if (word == "moves") {
+                is_move_mode = true;
+            } else if (is_move_mode) {
+                this->move(word);
+            } else {
+                std::cerr << "Warning: sfenstring" << std::endl;
+            }
+        }
+    }
+
+    std::string bestmove() const {
         if (this->can_declare()) return "win";
         auto res = this->moves();
         std::shuffle(res.begin(), res.end(), rng);
