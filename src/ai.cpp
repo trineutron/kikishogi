@@ -97,14 +97,10 @@ class State {
         }
         assert(turn * type > 0);
         if (promote) {
-            if (type > 0) {
-                type += 8;
-            } else {
-                type -= 8;
-            }
+            type += turn * 8;
         }
         int type_capture = abs(board[x_next][y_next]);
-        if (not is_new and type_capture) {
+        if (type_capture) {
             mochigoma[(1 - turn) >> 1][type_capture & 7]++;
         }
         board[x_next][y_next] = type;
@@ -146,13 +142,13 @@ class State {
                                 can_promote = i >= 6 or i_next >= 6;
                             }
                             if (type == 5 or type >= 8) can_promote = false;
-                            if (turn * board[i_next][j_next] == -8) {
-                                res.push_back("capture");
+                            assert(turn * board[i_next][j_next] != -8);
+                            if (can_move(i_next, type, turn)) {
+                                res.emplace_back(s);
                             }
-                            if (can_move(i_next, type, turn)) res.push_back(s);
                             if (can_promote) {
                                 s += '+';
-                                res.push_back(s);
+                                res.emplace_back(s);
                             }
                             if (board[i_next][j_next]) break;
                         }
@@ -160,6 +156,7 @@ class State {
                 }
             }
         }
+
         bool fu_already[9]{};
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
@@ -168,44 +165,80 @@ class State {
                 }
             }
         }
-
         for (int type = 1; type < 8; type++) {
             if (mochigoma[(1 - turn) >> 1][type] == 0) continue;
             for (int i = 0; i < 9; i++) {
                 for (int j = 0; j < 9; j++) {
-                    if (board[i][j]) continue;
-                    if (not can_move(i, type, turn)) continue;
-                    if (type == 1 and fu_already[j]) continue;
+                    if (board[i][j]) {
+                        continue;  // 既に駒がある
+                    }
+                    if (not can_move(i, type, turn)) {
+                        continue;  // 行き場のない駒
+                    }
+                    if (type == 1 and fu_already[j]) {
+                        continue;  // 二歩
+                    }
                     std::string s;
                     s += text_type[type];
                     s += '*';
                     s += '9' - j;
                     s += i + 'a';
-                    res.push_back(s);
+                    res.emplace_back(s);
                 }
             }
         }
         return res;
     }
 
+    bool is_check() const {
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                const int type = turn * board[i][j];
+                if (type <= 0) continue;
+                int type_move[2]{type, 0};
+                if (9 <= type and type <= 13) {
+                    type_move[0] = 5;
+                } else if (type >= 14) {
+                    type_move[0] = type - 8;
+                    type_move[1] = 8;
+                }
+                for (int k = 0; k < 2; k++) {
+                    int run_limit = type_run[type_move[k]] ? 8 : 1;
+                    for (auto &&[dx, dy] : type_dir[type_move[k]]) {
+                        for (int run_idx = 1; run_idx <= run_limit; run_idx++) {
+                            const int i_next = i + run_idx * turn * dx;
+                            const int j_next = j + run_idx * dy;
+                            if (not in_board(i_next, j_next)) break;
+                            if (turn * board[i_next][j_next] > 0) break;
+                            if (turn * board[i_next][j_next] == -8) {
+                                return true;
+                            }
+                            if (board[i_next][j_next]) break;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     bool is_legal(const std::string &move_to_check) const {
         State state_new{*this};
         state_new.move(move_to_check);
-        for (auto &&s : state_new.moves()) {
-            if (s == "capture") return false;
-        }
+        if (state_new.is_check()) return false;  // 王手
         if (move_to_check[0] == 'P') {
             return state_new.bestmove() != "resign";
         }
         return true;
     }
 
-    bool can_declare() const {
-        State state_pass{*this};
-        state_pass.pass();
-        for (auto &&s : state_pass.moves()) {
-            if (s == "capture") return false;  // 王手
+    bool can_declare() {
+        pass();
+        if (is_check()) {
+            pass();
+            return false;  // 王手
         }
+        pass();
         int score = 0, count = 0, king = 0;
         for (int i = 0; i < 3; i++) {
             int idx = turn == 1 ? i : 8 - i;
@@ -257,12 +290,12 @@ class State {
         }
     }
 
-    std::string bestmove() const {
-        if (this->can_declare()) return "win";
-        auto res = this->moves();
+    std::string bestmove() {
+        if (can_declare()) return "win";
+        auto res = moves();
         std::shuffle(res.begin(), res.end(), rng);
         for (auto &&s : res) {
-            if (this->is_legal(s)) return s;
+            if (is_legal(s)) return s;
         }
         return "resign";
     }
